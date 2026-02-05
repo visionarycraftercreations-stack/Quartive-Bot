@@ -104,13 +104,16 @@ export interface OrderIntent {
 
 export enum MarketEventType {
   PRICE_UPDATE = 'PRICE_UPDATE',
-  VOLUME_SPIKE = 'VOLUME_SPIKE'
+  VOLUME_SPIKE = 'VOLUME_SPIKE',
+  TOKEN_DISCOVERED = 'TOKEN_DISCOVERED',
+  LIQUIDITY_ADD = 'LIQUIDITY_ADD'
 }
 
 export interface MarketEvent {
   type: MarketEventType;
   data: any;
   timestamp: number;
+  tokenAddress?: string;
 }
 
 export interface FeedHealth {
@@ -169,4 +172,37 @@ export interface SignedTransaction {
   txHash: string;
   signature: string;
   broadcastTime: number;
+}
+
+export interface Signal {
+  id: string;
+  token: string;
+  type: 'ENTRY_LONG' | 'EXIT_LONG';
+  score: number;
+  confidence: number;
+  timestamp: number;
+  metadata: any;
+}
+
+export interface LedgerTransaction {
+  id: string;
+  timestamp: number;
+  type: 'DEPOSIT' | 'WITHDRAWAL' | 'TRADE_FEE' | 'REALIZED_PNL';
+  amount: number;
+  token?: string;
+  referenceId?: string;
+}
+
+export interface BacktestConfig {
+  startDate: number;
+  endDate: number;
+  initialBalance: number;
+  includeFees: boolean;
+}
+
+export enum ReplaySpeed {
+  REALTIME = 1,
+  FAST = 10,
+  TURBO = 100,
+  INSTANT = 999
 }

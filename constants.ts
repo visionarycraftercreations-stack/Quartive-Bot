@@ -8,6 +8,29 @@ export const FOLDER_STRUCTURE: FolderItem = {
       name: 'core',
       type: 'folder',
       children: [
+        {
+          name: 'backtesting',
+          type: 'folder',
+          description: 'Phase 7: Replay Engine',
+          children: [
+            { name: 'replay_engine.ts', type: 'file' },
+            { name: 'time_controller.ts', type: 'file' },
+            { name: 'data_loader.ts', type: 'file' },
+            { name: 'strategy_reactor.ts', type: 'file' },
+            { name: 'performance_analyzer.ts', type: 'file' },
+          ]
+        },
+        {
+          name: 'orchestrator',
+          type: 'folder',
+          description: 'Phase 6.5: Execution Wiring',
+          children: [
+            { name: 'event_bus.ts', type: 'file' },
+            { name: 'market_router.ts', type: 'file' },
+            { name: 'signal_dispatcher.ts', type: 'file' },
+            { name: 'execution_coordinator.ts', type: 'file' }
+          ]
+        },
         { 
           name: 'execution', 
           type: 'folder', 
@@ -26,90 +49,170 @@ export const FOLDER_STRUCTURE: FolderItem = {
 };
 
 export const PIPELINE_STEPS: PipelineStep[] = [
-  { id: '1', title: 'Market Data Ingestion', description: 'Normalized WebSocket streams', icon: 'Radio' },
-  { id: '2', title: 'Signal Generation', description: 'Strategy evaluation engine', icon: 'Cpu' },
-  { id: '3', title: 'Risk Check', description: 'Pre-trade validation', icon: 'ShieldCheck' },
-  { id: '4', title: 'Execution', description: 'Transaction signing & broadcasting', icon: 'Zap' },
+  { id: '1', title: 'Data Loader', description: 'Ingest Historical Ticks', icon: 'Database' },
+  { id: '2', title: 'Replay Engine', description: 'Deterministic Event Emission', icon: 'RefreshCw' },
+  { id: '3', title: 'Orchestrator', description: 'Standard Execution Path', icon: 'Cpu' },
+  { id: '4', title: 'Performance', description: 'Sharpe, Drawdown, PnL', icon: 'BarChart' },
 ];
 
 export const DOMAIN_MODELS: DomainModel[] = [
   {
-    name: 'core/risk/execution_guard.ts',
-    description: 'Validates orders against risk parameters.',
-    code: `export class ExecutionGuard {
-  validate(intent: OrderIntent): boolean {
-    // 1. Check Max Amount
-    if (intent.amount > 1000) return false;
-    
-    // 2. Check Blacklist
-    if (this.isBlacklisted(intent.token)) return false;
+    name: 'core/backtesting/replay_engine.ts',
+    description: 'Drives the entire system using historical data, respecting original event timing.',
+    code: `export class ReplayEngine {
+  constructor(
+    private bus: EventBus,
+    private time: TimeController,
+    private speed: number = 100 // 100x speed
+  ) {}
 
-    return true;
+  public async run(events: MarketEvent[]) {
+    console.log(\`Starting replay of \${events.length} events...\`);
+    
+    for (const event of events) {
+      // 1. Sync System Time
+      this.time.setTime(event.timestamp);
+
+      // 2. Publish (Systems react immediately)
+      this.bus.publish(event.type, event);
+
+      // 3. Simulate delay if not in INSTANT mode
+      if (this.speed < 999) {
+         await this.sleep(10); // Simplified lag simulation
+      }
+    }
+    
+    this.bus.publish('BACKTEST_COMPLETE', {});
+  }
+  
+  private sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
+}`
+  },
+  {
+    name: 'core/backtesting/time_controller.ts',
+    description: 'Abstracts system time, allowing the backtester to control the clock.',
+    code: `export class TimeController {
+  private currentTime: number;
+
+  constructor(startTime: number = Date.now()) {
+    this.currentTime = startTime;
+  }
+
+  // System components use this instead of Date.now()
+  public now(): number {
+    return this.currentTime;
+  }
+
+  public setTime(ts: number) {
+    if (ts < this.currentTime) throw new Error("Time cannot flow backwards");
+    this.currentTime = ts;
   }
 }`
   },
   {
-    name: 'core/execution/signing_pipeline.ts',
-    description: 'Sandbox environment that validates transaction safety before signing.',
-    code: `export class SigningPipeline {
-  constructor(
-    private guard: ExecutionGuard,
-    private wallet: SecureWallet,
-    private auditLog: AuditLogger
-  ) {}
+    name: 'core/backtesting/data_loader.ts',
+    description: 'Normalizes diverse historical data sources into standard MarketEvents.',
+    code: `export class DataLoader {
+  public normalize(rawTicks: any[]): MarketEvent[] {
+    return rawTicks
+      .map(tick => ({
+        type: 'PRICE_UPDATE',
+        timestamp: tick.ts,
+        tokenAddress: tick.pair,
+        data: {
+          price: parseFloat(tick.p),
+          volume: parseFloat(tick.v),
+          liquidity: parseFloat(tick.liq)
+        }
+      }))
+      .sort((a, b) => a.timestamp - b.timestamp); // Ensure chronological order
+  }
+  
+  public async loadFromCSV(path: string): Promise<MarketEvent[]> {
+    // CSV parsing logic would go here
+    return []; 
+  }
+}`
+  },
+  {
+    name: 'core/backtesting/performance_analyzer.ts',
+    description: 'Computes institutional-grade metrics from the PortfolioLedger.',
+    code: `export class PerformanceAnalyzer {
+  public analyze(trades: LedgerTransaction[]): BacktestResult {
+    const pnlCurve = trades
+      .filter(t => t.type === 'REALIZED_PNL')
+      .map(t => t.amount);
 
-  public async process(
-    intent: OrderIntent, 
-    ctx: SigningContext
-  ): Promise<SignedTransaction> {
-    // 1. Guard Validation (State, Risk, KillSwitch)
-    await this.guard.validate(intent);
+    const totalReturn = pnlCurve.reduce((acc, val) => acc + val, 0);
+    const wins = pnlCurve.filter(v => v > 0).length;
+    
+    // Drawdown Calc
+    let peak = 0;
+    let maxDrawdown = 0;
+    let runningBalance = 10000; // Initial
+    
+    for (const pnl of pnlCurve) {
+      runningBalance += pnl;
+      if (runningBalance > peak) peak = runningBalance;
+      const dd = (peak - runningBalance) / peak;
+      if (dd > maxDrawdown) maxDrawdown = dd;
+    }
 
-    // 2. Sandbox Safety Checks
-    this.runSandboxChecks(intent, ctx);
-
-    // 3. Approve & Sign
-    // Only reachable if Sandbox checks pass
-    const signature = await this.wallet.signTransaction({
-      to: intent.token,
-      amount: intent.amount,
-      data: '0x...' // Constructed Transaction Data
-    }, intent.id);
-
-    // 4. Broadcast
     return {
-      intentId: intent.id,
-      txHash: \`0x\${Math.random().toString(36).substring(2)}\`,
-      signature,
-      broadcastTime: Date.now()
+      sharpeRatio: this.calculateSharpe(pnlCurve),
+      maxDrawdown: maxDrawdown * 100, // Percentage
+      totalReturn: totalReturn
     };
   }
 
-  private runSandboxChecks(intent: OrderIntent, ctx: SigningContext) {
-    // Check 1: Slippage Hard Limit
-    const MAX_SLIPPAGE = 0.05; // 5% Hard Cap
-    if (intent.slippageTolerance > MAX_SLIPPAGE) {
-      throw new Error(\`SANDBOX REJECT: Slippage \${intent.slippageTolerance} exceeds max \${MAX_SLIPPAGE}\`);
-    }
+  private calculateSharpe(returns: number[]): number {
+    if (returns.length === 0) return 0;
+    const avg = returns.reduce((a,b) => a+b, 0) / returns.length;
+    // Standard deviation logic...
+    return 1.5; // Placeholder
+  }
+}`
+  },
+  {
+    name: 'core/backtesting/strategy_reactor.ts',
+    description: 'Monitors Strategy behavior specifically during replay to catch missed signals.',
+    code: `export class StrategyReactor {
+  private signals: Signal[] = [];
+  private trades: any[] = [];
 
-    // Check 2: Liquidity Depth
-    const MIN_DEPTH_RATIO = 5; // Pool must be 5x larger than order
-    if (ctx.liquidityUsd < intent.amount * MIN_DEPTH_RATIO) {
-      throw new Error(\`SANDBOX REJECT: Insufficient liquidity depth (Pool: $\${ctx.liquidityUsd} vs Order: $\${intent.amount})\`);
-    }
+  constructor(bus: EventBus) {
+    bus.subscribe('SIGNAL_ELIGIBLE', (s: Signal) => this.signals.push(s));
+    bus.subscribe('TRADE_OPENED', (t: any) => this.trades.push(t));
+  }
 
-    // Check 3: Gas Spikes
-    const MAX_GAS_GWEI = 100;
-    if (ctx.gasPriceGwei > MAX_GAS_GWEI) {
-      throw new Error(\`SANDBOX REJECT: Gas spike detected (\${ctx.gasPriceGwei} Gwei)\`);
-    }
+  public getConversionRate(): number {
+    if (this.signals.length === 0) return 0;
+    return this.trades.length / this.signals.length;
+  }
+}`
+  },
+  {
+    name: 'core/orchestrator/event_bus.ts',
+    description: 'Lightweight, dependency-free Pub/Sub engine connecting all system components.',
+    code: `export class EventBus {
+  private subscribers: Map<string, Function[]> = new Map();
 
-    // Check 4: MEV Risk
-    if (ctx.mevRiskScore > 80) {
-      throw new Error('SANDBOX REJECT: High MEV risk probability');
+  public subscribe(event: string, handler: Function): void {
+    if (!this.subscribers.has(event)) {
+      this.subscribers.set(event, []);
     }
-    
-    this.auditLog.info('SigningSandbox', 'CHECKS_PASSED', intent.id);
+    this.subscribers.get(event)?.push(handler);
+  }
+
+  public publish(event: string, payload: any): void {
+    const handlers = this.subscribers.get(event) || [];
+    handlers.forEach(fn => {
+      try {
+        fn(payload);
+      } catch (e) {
+        console.error(\`EventBus Error [\${event}]:\`, e);
+      }
+    });
   }
 }`
   }

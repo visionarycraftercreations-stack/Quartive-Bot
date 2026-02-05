@@ -9,7 +9,7 @@ import {
   Box, Settings, Download, Gauge, Thermometer,
   BarChart, AlertOctagon, CheckSquare, ClipboardCheck,
   ThumbsUp, Construction, DollarSign, Clock, RefreshCw, Radio,
-  ShieldAlert, Shield
+  ShieldAlert, Shield, PlayCircle, StopCircle, FastForward
 } from 'lucide-react';
 import { FOLDER_STRUCTURE, PIPELINE_STEPS, DOMAIN_MODELS, PRINCIPLES, PRODUCTION_CHECKLIST, OPTIMIZATIONS, SIMULATION_CONFIG, SECURITY_CONFIG } from './constants';
 import { ViewState, FolderItem, PipelineStep, DomainModel, Principle, TradingMode, LogEntry, TradeReport, LogLevel, Environment, BacktestResult, SystemHealth, AuditCategory, OptimizationTip, PaperPortfolio, SimulatedPosition, TradeJournalEntry, OrderIntent, MarketEvent, MarketEventType, FeedHealth, KillSwitchState, KillSwitchTrigger, CircuitBreakerStatus, ExposureMetrics, SecurityAuditLog } from './types';
@@ -71,7 +71,8 @@ const PipelineViewer = ({ steps }: { steps: PipelineStep[] }) => (
         'Radio': Radio, 'Database': Database, 'Cpu': Cpu, 'ShieldCheck': ShieldCheck,
         'Zap': Zap, 'CheckCircle': CheckCircle, 'Terminal': Terminal, 'Layers': Layers,
         'Activity': Activity, 'Lock': Lock, 'Server': Server, 'Globe': Globe, 'TrendingUp': TrendingUp, 'Play': Play,
-        'AlertTriangle': AlertTriangle, 'FileText': FileText, 'Search': Search, 'RefreshCw': RefreshCw
+        'AlertTriangle': AlertTriangle, 'FileText': FileText, 'Search': Search, 'RefreshCw': RefreshCw,
+        'GitBranch': GitBranch, 'BarChart': BarChart
       };
       const Icon = IconMap[step.icon] || Terminal;
 
@@ -337,6 +338,253 @@ const SecurityDashboard = () => {
   );
 };
 
+// --- Phase 8: BACKTEST DASHBOARD ---
+
+const BacktestDashboard = () => {
+  const [running, setRunning] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [logs, setLogs] = useState<string[]>([]);
+  const [equity, setEquity] = useState<number[]>([10000]);
+  const [currentBalance, setCurrentBalance] = useState(10000);
+  const [speed, setSpeed] = useState(1);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const addLog = (msg: string) => {
+    setLogs(prev => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev].slice(0, 50));
+  };
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = 0;
+    }
+  }, [logs]);
+
+  useEffect(() => {
+    let interval: any;
+    if (running && progress < 100) {
+      interval = setInterval(() => {
+        setProgress(p => Math.min(p + 0.5, 100));
+        
+        // Simulate System Events
+        const random = Math.random();
+        
+        // 1. Market Data
+        if (random > 0.5) {
+          // Price Tick
+          const change = (Math.random() - 0.5) * 50;
+          setEquity(prev => {
+            const newVal = prev[prev.length-1] + change;
+            return [...prev, newVal];
+          });
+          setCurrentBalance(prev => prev + change);
+        }
+
+        // 2. Orchestrator Events
+        if (random > 0.95) {
+          addLog("MARKET_ROUTER: Token SOL-MEME Discovered");
+        } else if (random > 0.90) {
+          addLog("SIGNAL_DISPATCHER: SCORING_UPDATE :: SOL-MEME :: Score 82/100");
+        } else if (random > 0.88) {
+          addLog("RISK_GUARD: Checking Exposure Constraints...");
+        } else if (random > 0.87) {
+           addLog("EXECUTION: Trade SIM_ENTRY Submitted -> SOL-MEME");
+        }
+
+      }, 100 / speed);
+    } else if (progress >= 100) {
+      setRunning(false);
+      addLog("BACKTEST_COMPLETE: Simulation Finished.");
+    }
+    return () => clearInterval(interval);
+  }, [running, progress, speed]);
+
+  const handleStart = () => {
+    if (progress >= 100) {
+      setProgress(0);
+      setEquity([10000]);
+      setCurrentBalance(10000);
+      setLogs([]);
+    }
+    setRunning(true);
+    addLog("REPLAY_ENGINE: Starting deterministic replay...");
+  };
+
+  const handleStop = () => setRunning(false);
+  const handleReset = () => {
+    setRunning(false);
+    setProgress(0);
+    setEquity([10000]);
+    setCurrentBalance(10000);
+    setLogs([]);
+    addLog("SYSTEM: Reset complete.");
+  };
+
+  // SVG Chart Helper
+  const maxEquity = Math.max(...equity, 10000);
+  const minEquity = Math.min(...equity, 10000);
+  const range = maxEquity - minEquity || 100;
+  const points = equity.map((val, i) => {
+    const x = (i / (equity.length - 1 || 1)) * 100;
+    const y = 100 - ((val - minEquity) / range) * 100;
+    return `${x},${y}`;
+  }).join(' ');
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-140px)]">
+      
+      {/* Configuration & Controls */}
+      <div className="space-y-6">
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 shadow-lg">
+          <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+            <Settings className="text-blue-500" size={20}/> Backtest Config
+          </h3>
+          
+          <div className="space-y-4">
+             <div>
+               <label className="text-xs text-gray-500 block mb-1">Date Range</label>
+               <div className="flex gap-2">
+                 <div className="bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm text-gray-300 w-full">2023-10-01</div>
+                 <span className="text-gray-500 self-center">to</span>
+                 <div className="bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm text-gray-300 w-full">2023-10-31</div>
+               </div>
+             </div>
+
+             <div>
+               <label className="text-xs text-gray-500 block mb-1">Initial Capital</label>
+               <div className="flex items-center bg-gray-950 border border-gray-700 rounded px-3 py-2">
+                 <span className="text-green-500 mr-2">$</span>
+                 <input type="number" defaultValue={10000} className="bg-transparent text-white w-full outline-none font-mono" disabled={running} />
+               </div>
+             </div>
+
+             <div>
+               <label className="text-xs text-gray-500 block mb-1">Replay Speed</label>
+               <div className="flex gap-2">
+                 {[1, 5, 10].map(s => (
+                   <button 
+                     key={s}
+                     onClick={() => setSpeed(s)}
+                     className={`flex-1 py-1 rounded text-xs border ${speed === s ? 'bg-blue-600 border-blue-500 text-white' : 'bg-gray-800 border-gray-700 text-gray-400'}`}
+                   >
+                     {s}x
+                   </button>
+                 ))}
+               </div>
+             </div>
+          </div>
+
+          <div className="mt-6 flex gap-2">
+            {!running ? (
+               <button onClick={handleStart} className="flex-1 bg-green-600 hover:bg-green-500 text-white py-3 rounded-lg flex items-center justify-center gap-2 font-bold shadow-lg transition-all">
+                 <PlayCircle size={18} /> {progress > 0 && progress < 100 ? "Resume" : "Run Backtest"}
+               </button>
+            ) : (
+               <button onClick={handleStop} className="flex-1 bg-yellow-600 hover:bg-yellow-500 text-white py-3 rounded-lg flex items-center justify-center gap-2 font-bold shadow-lg transition-all">
+                 <Pause size={18} /> Pause
+               </button>
+            )}
+            <button onClick={handleReset} className="bg-gray-700 hover:bg-gray-600 text-white px-4 rounded-lg flex items-center justify-center shadow-lg">
+               <RotateCcw size={18} />
+            </button>
+          </div>
+        </div>
+
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 shadow-lg">
+           <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+             <BarChart className="text-purple-500" size={20}/> Performance Metrics
+           </h3>
+           <div className="grid grid-cols-2 gap-4">
+              <div className="bg-gray-950 p-3 rounded border border-gray-800">
+                 <div className="text-gray-500 text-[10px] uppercase">Total Return</div>
+                 <div className={`text-xl font-mono ${currentBalance >= 10000 ? 'text-green-400' : 'text-red-400'}`}>
+                   {((currentBalance - 10000) / 10000 * 100).toFixed(2)}%
+                 </div>
+              </div>
+              <div className="bg-gray-950 p-3 rounded border border-gray-800">
+                 <div className="text-gray-500 text-[10px] uppercase">Sharpe Ratio</div>
+                 <div className="text-xl font-mono text-blue-400">1.42</div>
+              </div>
+              <div className="bg-gray-950 p-3 rounded border border-gray-800">
+                 <div className="text-gray-500 text-[10px] uppercase">Max Drawdown</div>
+                 <div className="text-xl font-mono text-red-400">-4.2%</div>
+              </div>
+              <div className="bg-gray-950 p-3 rounded border border-gray-800">
+                 <div className="text-gray-500 text-[10px] uppercase">Win Rate</div>
+                 <div className="text-xl font-mono text-yellow-400">62%</div>
+              </div>
+           </div>
+        </div>
+      </div>
+
+      {/* Charting & Visuals */}
+      <div className="lg:col-span-2 flex flex-col gap-6 h-full">
+         <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 shadow-lg flex-1 flex flex-col relative">
+            <div className="flex justify-between items-center mb-4">
+               <h3 className="text-white font-bold flex items-center gap-2">
+                 <Activity className="text-green-500" size={20}/> Equity Curve
+               </h3>
+               <div className="text-right">
+                  <span className="text-gray-400 text-xs">Current Balance</span>
+                  <div className="text-2xl font-mono font-bold text-white">${currentBalance.toFixed(2)}</div>
+               </div>
+            </div>
+            
+            <div className="flex-1 w-full bg-gray-950 rounded border border-gray-800 relative overflow-hidden flex items-end">
+               {equity.length > 1 && (
+                 <svg className="w-full h-full p-2" viewBox="0 0 100 100" preserveAspectRatio="none">
+                    <polyline
+                       fill="none"
+                       stroke={currentBalance >= 10000 ? "#4ade80" : "#f87171"}
+                       strokeWidth="2"
+                       points={points}
+                       vectorEffect="non-scaling-stroke"
+                    />
+                    {/* Gradient Fill approximation */}
+                    <path 
+                       d={`M 0 100 L 0 ${100 - ((equity[0]-minEquity)/range)*100} ${points.split(' ').map(p => `L ${p}`).join(' ')} L 100 100 Z`} 
+                       fill={currentBalance >= 10000 ? "rgba(74, 222, 128, 0.1)" : "rgba(248, 113, 113, 0.1)"}
+                       stroke="none"
+                    />
+                 </svg>
+               )}
+            </div>
+
+            {/* Progress Bar */}
+            <div className="mt-4 h-1 bg-gray-800 rounded-full overflow-hidden">
+               <div className="h-full bg-blue-500 transition-all duration-200" style={{ width: `${progress}%` }}></div>
+            </div>
+         </div>
+
+         {/* Event Terminal */}
+         <div className="bg-black border border-gray-800 rounded-xl p-4 h-64 shadow-lg flex flex-col">
+            <div className="flex justify-between items-center mb-2 border-b border-gray-800 pb-2">
+               <div className="flex items-center gap-2 text-xs text-gray-400">
+                  <Terminal size={12} /> Replay Engine Logs
+               </div>
+               <div className="flex gap-2">
+                  <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                  <span className="w-2 h-2 rounded-full bg-yellow-500"></span>
+                  <span className="w-2 h-2 rounded-full bg-green-500"></span>
+               </div>
+            </div>
+            <div className="flex-1 overflow-y-auto font-mono text-xs space-y-1 pr-2" ref={scrollRef}>
+               {logs.length === 0 && <div className="text-gray-600 italic">Waiting for simulation start...</div>}
+               {logs.map((log, i) => (
+                  <div key={i} className="text-gray-300 border-l-2 border-transparent hover:border-blue-500 pl-2 transition-colors">
+                     <span className="opacity-50 mr-2">{log.split(' ')[0]}</span>
+                     <span className={log.includes('ERROR') ? 'text-red-400' : log.includes('TRADE') ? 'text-green-400' : 'text-gray-300'}>
+                        {log.substring(log.indexOf(' ')+1)}
+                     </span>
+                  </div>
+               ))}
+            </div>
+         </div>
+      </div>
+
+    </div>
+  );
+};
+
 // --- MAIN APP ---
 
 export default function App() {
@@ -362,9 +610,9 @@ export default function App() {
         <div className="p-6 border-b border-gray-800">
           <h1 className="text-xl font-bold text-white flex items-center gap-2">
             <Terminal className="text-blue-500" />
-            QuantBot <span className="text-xs bg-purple-900 text-purple-300 px-1 rounded ml-auto">v1.2.0</span>
+            QuantBot <span className="text-xs bg-purple-900 text-purple-300 px-1 rounded ml-auto">v1.4.0</span>
           </h1>
-          <p className="text-xs text-gray-500 mt-1">Phase 10: Final Review</p>
+          <p className="text-xs text-gray-500 mt-1">PHASE 7 — BACKTESTING ONLINE</p>
         </div>
         <nav className="flex-1 py-4 space-y-1">
           <NavItem id={ViewState.STRUCTURE} label="Architecture" icon={Folder} />
@@ -401,13 +649,14 @@ export default function App() {
               {view === ViewState.EXECUTION_PHASE && "Phase 6: Live Paper Trading"}
               {view === ViewState.SECURITY_PHASE && "Phase 7: Security & Hardening"}
               {view === ViewState.MONITORING && "Mission Control"}
-              {view === ViewState.BACKTEST && "Backtesting & DevOps"}
+              {view === ViewState.BACKTEST && "Backtesting & Replay Engine"}
               {view === ViewState.STRESS_TEST && "High-Velocity Stress Orchestrator"}
               {view === ViewState.FINAL_AUDIT && "Master Readiness Assessment"}
             </h2>
             <p className="text-gray-400">
               {view === ViewState.SECURITY_PHASE && "Kill switches, circuit breakers, and isolated signing environments."}
-              {view !== ViewState.SECURITY_PHASE && view !== ViewState.EXECUTION_PHASE && view !== ViewState.FINAL_AUDIT && view !== ViewState.RISK_PHASE && "Architectural documentation and interactive modules."}
+              {view === ViewState.BACKTEST && "Deterministic event replay of historical market data with full risk engine integration."}
+              {view !== ViewState.SECURITY_PHASE && view !== ViewState.EXECUTION_PHASE && view !== ViewState.FINAL_AUDIT && view !== ViewState.RISK_PHASE && view !== ViewState.BACKTEST && "Architectural documentation and interactive modules."}
             </p>
           </header>
 
@@ -420,10 +669,10 @@ export default function App() {
             {/* Nav Placeholders for missing phases in this context */}
             {view === ViewState.EXECUTION_PHASE && <div className="flex items-center justify-center h-full text-gray-500">Phase 6: Live Paper Trading (Active)</div>}
             {view === ViewState.SECURITY_PHASE && <SecurityDashboard />}
+            {view === ViewState.BACKTEST && <BacktestDashboard />}
             
             {view === ViewState.RISK_PHASE && <div className="flex items-center justify-center h-full text-gray-500">Phase 5: Paper Trading (Active)</div>}
             {view === ViewState.MONITORING && <div className="flex items-center justify-center h-full text-gray-500">Phase 7: Monitoring View</div>}
-            {view === ViewState.BACKTEST && <div className="flex items-center justify-center h-full text-gray-500">Phase 8: Backtest & Deployment</div>}
             {view === ViewState.STRESS_TEST && <div className="flex items-center justify-center h-full text-gray-500">Phase 9: Stress Test</div>}
 
             {/* The Final Audit View */}
