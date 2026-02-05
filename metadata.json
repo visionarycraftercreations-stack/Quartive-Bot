@@ -1,5 +1,5 @@
 {
-  "name": "QuantBot Architect Viewer",
+  "name": "QuantBot",
   "description": "Interactive architectural documentation for a production-grade Solana trading bot.",
   "requestFramePermissions": []
 }

@@ -8,10 +8,11 @@ import {
   Globe, Server, Wifi, Bell, Eye, X,
   Box, Settings, Download, Gauge, Thermometer,
   BarChart, AlertOctagon, CheckSquare, ClipboardCheck,
-  ThumbsUp, Construction, DollarSign, Clock, RefreshCw
+  ThumbsUp, Construction, DollarSign, Clock, RefreshCw, Radio,
+  ShieldAlert, Shield
 } from 'lucide-react';
-import { FOLDER_STRUCTURE, PIPELINE_STEPS, DOMAIN_MODELS, PRINCIPLES, PRODUCTION_CHECKLIST, OPTIMIZATIONS, SIMULATION_CONFIG } from './constants';
-import { ViewState, FolderItem, PipelineStep, DomainModel, Principle, TradingMode, LogEntry, TradeReport, LogLevel, Environment, BacktestResult, SystemHealth, AuditCategory, OptimizationTip, PaperPortfolio, SimulatedPosition, TradeJournalEntry, OrderIntent } from './types';
+import { FOLDER_STRUCTURE, PIPELINE_STEPS, DOMAIN_MODELS, PRINCIPLES, PRODUCTION_CHECKLIST, OPTIMIZATIONS, SIMULATION_CONFIG, SECURITY_CONFIG } from './constants';
+import { ViewState, FolderItem, PipelineStep, DomainModel, Principle, TradingMode, LogEntry, TradeReport, LogLevel, Environment, BacktestResult, SystemHealth, AuditCategory, OptimizationTip, PaperPortfolio, SimulatedPosition, TradeJournalEntry, OrderIntent, MarketEvent, MarketEventType, FeedHealth, KillSwitchState, KillSwitchTrigger, CircuitBreakerStatus, ExposureMetrics, SecurityAuditLog } from './types';
 
 // --- SHARED COMPONENTS (Simplified for context) ---
 
@@ -67,10 +68,10 @@ const PipelineViewer = ({ steps }: { steps: PipelineStep[] }) => (
     {steps.map((step, index) => {
       const isLast = index === steps.length - 1;
       const IconMap: any = {
-        'Radio': Activity, 'Database': Database, 'Cpu': Cpu, 'ShieldCheck': ShieldCheck,
+        'Radio': Radio, 'Database': Database, 'Cpu': Cpu, 'ShieldCheck': ShieldCheck,
         'Zap': Zap, 'CheckCircle': CheckCircle, 'Terminal': Terminal, 'Layers': Layers,
         'Activity': Activity, 'Lock': Lock, 'Server': Server, 'Globe': Globe, 'TrendingUp': TrendingUp, 'Play': Play,
-        'AlertTriangle': AlertTriangle, 'FileText': FileText, 'Search': Search
+        'AlertTriangle': AlertTriangle, 'FileText': FileText, 'Search': Search, 'RefreshCw': RefreshCw
       };
       const Icon = IconMap[step.icon] || Terminal;
 
@@ -98,369 +99,237 @@ const PrincipleCard: React.FC<{ principle: Principle }> = ({ principle }) => (
   </div>
 );
 
-const ReadinessCard: React.FC<{ category: AuditCategory }> = ({ category }) => {
-  return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-lg">
-      <div className="flex justify-between items-start mb-4">
-        <div>
-          <h4 className="text-white font-bold text-lg">{category.name}</h4>
-          <div className="text-gray-500 text-xs mt-1">Audit Score: {category.score}/100</div>
-        </div>
-        <div className={`px-2 py-1 rounded text-xs font-bold ${
-          category.status === 'READY' ? 'bg-green-900 text-green-300' :
-          category.status === 'WARNING' ? 'bg-yellow-900 text-yellow-300' :
-          'bg-red-900 text-red-300'
-        }`}>
-          {category.status}
-        </div>
-      </div>
-      
-      <div className="space-y-2">
-        {category.items.map((item, idx) => (
-           <div key={idx} className="flex items-start gap-2 text-sm text-gray-300">
-              {item.done ? (
-                <CheckSquare size={16} className="text-green-500 shrink-0 mt-0.5" />
-              ) : (
-                <AlertOctagon size={16} className={`${item.critical ? 'text-red-500' : 'text-yellow-500'} shrink-0 mt-0.5`} />
-              )}
-              <span className={item.done ? 'opacity-80' : ''}>{item.label}</span>
-           </div>
-        ))}
-      </div>
-    </div>
-  );
-};
+// --- Phase 7: SECURITY DASHBOARD ---
 
-const OptimizationCard: React.FC<{ tip: OptimizationTip }> = ({ tip }) => (
-  <div className="bg-blue-900/10 border border-blue-500/30 rounded-xl p-5 hover:bg-blue-900/20 transition-all">
-    <div className="flex justify-between items-start mb-2">
-      <h4 className="text-blue-300 font-bold flex items-center gap-2">
-        <Zap size={16} /> {tip.title}
-      </h4>
-      <span className={`text-[10px] px-1.5 py-0.5 rounded border ${
-        tip.impact === 'HIGH' ? 'border-red-500 text-red-400' : 'border-blue-500 text-blue-400'
-      }`}>{tip.impact} IMPACT</span>
-    </div>
-    <p className="text-gray-400 text-sm mb-3">{tip.description}</p>
-    {tip.codeSnippet && (
-      <div className="bg-black/30 p-2 rounded text-xs font-mono text-gray-300 border border-white/10">
-        {tip.codeSnippet}
-      </div>
-    )}
-  </div>
-);
-
-const ReadinessDashboard = ({ setView }: { setView: (view: ViewState) => void }) => {
-  const allReady = PRODUCTION_CHECKLIST.every(c => c.status === 'READY');
-
-  const phases = [
-    { id: ViewState.RISK_PHASE, num: 5, label: "Risk & Simulation" },
-    { id: ViewState.EXECUTION_PHASE, num: 6, label: "Execution Engine" },
-    { id: ViewState.MONITORING, num: 7, label: "Mission Control" },
-    { id: ViewState.BACKTEST, num: 8, label: "Backtest & Deployment" },
-    { id: ViewState.STRESS_TEST, num: 9, label: "Stress Test & Chaos" },
-    { id: ViewState.FINAL_AUDIT, num: 10, label: "Final Review" },
-  ];
-
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-full">
-      {/* 1. Readiness Audit */}
-      <div className="lg:col-span-2 space-y-6">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-xl font-bold text-white flex items-center gap-2">
-            <ClipboardCheck className="text-green-400" />
-            System Readiness Audit
-          </h3>
-          <span className="text-sm text-gray-500">Last run: Just now</span>
-        </div>
-
-        {/* Phase Navigation Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
-           {phases.map(p => (
-             <button 
-               key={p.num}
-               onClick={() => setView(p.id)}
-               className="bg-gray-900 border border-gray-800 p-3 rounded hover:border-blue-500 hover:bg-gray-800 transition-all text-left group"
-             >
-               <div className="text-[10px] text-gray-500 uppercase font-bold group-hover:text-blue-400">Phase {p.num}</div>
-               <div className="text-xs font-bold text-gray-300 group-hover:text-white truncate">{p.label}</div>
-             </button>
-           ))}
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {PRODUCTION_CHECKLIST.map(cat => <ReadinessCard key={cat.id} category={cat} />)}
-        </div>
-
-        <div className="mt-8">
-           <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-             <Construction className="text-yellow-400" />
-             Recommended Optimizations
-           </h3>
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-             {OPTIMIZATIONS.map((tip, idx) => <OptimizationCard key={idx} tip={tip} />)}
-           </div>
-        </div>
-      </div>
-
-      {/* 2. Launch Control */}
-      <div className="lg:col-span-1 flex flex-col gap-6">
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 shadow-2xl relative overflow-hidden">
-          <h3 className="text-lg font-bold text-white mb-6 text-center">Launch Status</h3>
-          
-          <div className="flex justify-center mb-8">
-            <div className={`w-32 h-32 rounded-full border-4 flex items-center justify-center flex-col gap-1 shadow-[0_0_30px_rgba(0,0,0,0.5)] ${
-              allReady 
-                ? 'border-green-500 bg-green-900/20 shadow-green-900/50' 
-                : 'border-yellow-500 bg-yellow-900/20 shadow-yellow-900/50'
-            }`}>
-              <div className="text-3xl font-bold text-white">{allReady ? 'GO' : 'NO GO'}</div>
-              <div className="text-[10px] text-gray-400 uppercase tracking-widest">{allReady ? 'FLIGHT READY' : 'ISSUES FOUND'}</div>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-             <div className="bg-black/40 p-3 rounded border border-gray-800 flex justify-between items-center">
-               <span className="text-gray-400 text-xs">Environment</span>
-               <span className="text-blue-400 font-mono text-xs">PRODUCTION</span>
-             </div>
-             <div className="bg-black/40 p-3 rounded border border-gray-800 flex justify-between items-center">
-               <span className="text-gray-400 text-xs">Safety Lock</span>
-               <span className="text-green-400 font-mono text-xs">ENGAGED</span>
-             </div>
-             <div className="bg-black/40 p-3 rounded border border-gray-800 flex justify-between items-center">
-               <span className="text-gray-400 text-xs">Est. Latency</span>
-               <span className="text-yellow-400 font-mono text-xs">~45ms</span>
-             </div>
-          </div>
-
-          <button 
-            disabled={!allReady}
-            className={`w-full mt-6 py-4 rounded-lg font-bold text-white transition-all flex items-center justify-center gap-2 ${
-              allReady 
-                ? 'bg-green-600 hover:bg-green-500 shadow-lg shadow-green-900/40' 
-                : 'bg-gray-800 cursor-not-allowed opacity-50'
-            }`}
-          >
-            {allReady ? <ThumbsUp size={18}/> : <AlertTriangle size={18} />}
-            {allReady ? 'INITIALIZE PAPER TRADING' : 'RESOLVE WARNINGS FIRST'}
-          </button>
-        </div>
-
-        <div className="bg-blue-900/20 border border-blue-500/20 rounded-xl p-5">
-           <div className="flex items-center gap-3 mb-2">
-             <div className="bg-blue-500 rounded-full p-1"><Server size={14} className="text-white"/></div>
-             <div className="text-blue-300 font-bold text-sm">Deployment Target</div>
-           </div>
-           <p className="text-gray-400 text-xs leading-relaxed">
-             Docker Container (Node 20-alpine)<br/>
-             PM2 Cluster Mode (2 instances)<br/>
-             Redis Sidecar (Events)<br/>
-             Region: AWS eu-central-1 (Low Latency)
-           </p>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// --- SIMULATION DASHBOARD (PHASE 5) ---
-
-const SimulationDashboard = () => {
-  const [portfolio, setPortfolio] = useState<PaperPortfolio>({
-    balance: SIMULATION_CONFIG.startingBalance,
-    startBalance: SIMULATION_CONFIG.startingBalance,
-    equity: SIMULATION_CONFIG.startingBalance,
-    openPositions: [],
-    realizedPnL: 0,
-    usedMargin: 0
+const SecurityDashboard = () => {
+  const [killSwitch, setKillSwitch] = useState<KillSwitchState>({
+    status: 'ACTIVE',
+    timestamp: Date.now(),
+    recoveryMode: false
   });
 
-  const [logs, setLogs] = useState<TradeJournalEntry[]>([]);
-  const [isSimulating, setIsSimulating] = useState(false);
-  const [simStatus, setSimStatus] = useState<string>('IDLE');
+  const [circuitBreaker, setCircuitBreaker] = useState<CircuitBreakerStatus>({
+    dailyPnL: -120,
+    maxDailyLoss: SECURITY_CONFIG.maxDailyLossUsd,
+    drawdownPercent: 2.4,
+    tradeCount: 15,
+    maxTrades: 50,
+    isBreached: false
+  });
 
-  // Deterministic Fill Logic Mock
-  const simulateExecution = async (token: string, direction: 'BUY'|'SELL', amountUsd: number) => {
-    setIsSimulating(true);
-    setSimStatus('RPC REQUEST...');
-    
-    // 1. Latency (Random between min/max)
-    const latency = Math.floor(Math.random() * (SIMULATION_CONFIG.latencyMs.max - SIMULATION_CONFIG.latencyMs.min)) + SIMULATION_CONFIG.latencyMs.min;
-    await new Promise(r => setTimeout(r, latency));
+  const [exposure, setExposure] = useState<ExposureMetrics>({
+    totalExposureUsd: 1500,
+    maxTotalExposure: 4000,
+    maxSingleTradePercent: 5,
+    maxTokenExposurePercent: 12,
+    currentRiskScore: 35
+  });
 
-    // 2. Chaos/Failures
-    if (Math.random() < 0.1) {
-       setLogs(prev => [{ 
-         tradeId: Date.now().toString(), 
-         timestamp: Date.now(), 
-         token, 
-         type: direction, 
-         entryPrice: 0, 
-         size: 0, 
-         signalScore: 0,
-         confidenceScore: 0,
-         executionLatency: latency,
-         notes: `FAILED: Tx Timeout (${latency}ms)` 
-       }, ...prev]);
-       setSimStatus('FAILED');
-       setIsSimulating(false);
-       return;
-    }
+  const [auditLogs, setAuditLogs] = useState<SecurityAuditLog[]>([]);
 
-    setSimStatus('FILLING...');
-    
-    // 3. Pricing & Slippage
-    const basePrice = 100 + (Math.random() * 10 - 5);
-    const slippage = (amountUsd / 100000) * basePrice * SIMULATION_CONFIG.slippageMultiplier; 
-    const fillPrice = direction === 'BUY' ? basePrice + slippage : basePrice - slippage;
+  // Simulation
+  useEffect(() => {
+    const interval = setInterval(() => {
+       // Randomly generate logs
+       if (Math.random() > 0.6) {
+         const actions = ['WALLET_AUTH', 'RISK_CHECK', 'EXPOSURE_CHECK', 'SIGNING_ATTEMPT'];
+         const outcomes: ('ALLOWED' | 'DENIED')[] = Math.random() > 0.1 ? ['ALLOWED'] : ['DENIED'];
+         const newLog: SecurityAuditLog = {
+           id: Math.random().toString(36).substring(7),
+           timestamp: Date.now(),
+           severity: outcomes[0] === 'ALLOWED' ? 'INFO' : 'WARNING',
+           component: 'ExecutionGuard',
+           action: actions[Math.floor(Math.random() * actions.length)],
+           outcome: outcomes[0],
+           details: outcomes[0] === 'ALLOWED' ? 'Verified successfully' : 'Policy violation detected'
+         };
+         setAuditLogs(prev => [newLog, ...prev].slice(0, 10));
+       }
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
 
-    // 4. Update Ledger
-    const newLog: TradeJournalEntry = {
-      tradeId: Date.now().toString(),
+  const toggleKillSwitch = () => {
+    const newStatus = killSwitch.status === 'ACTIVE' ? 'HALTED' : 'ACTIVE';
+    setKillSwitch({
+      status: newStatus,
+      trigger: newStatus === 'HALTED' ? KillSwitchTrigger.MANUAL : undefined,
       timestamp: Date.now(),
-      token,
-      type: direction,
-      entryPrice: fillPrice,
-      size: amountUsd / fillPrice,
-      signalScore: 85,
-      confidenceScore: 0.92,
-      executionLatency: latency,
-      notes: `Filled @ $${fillPrice.toFixed(2)} (Slippage: ${(slippage/basePrice*100).toFixed(2)}%)`
-    };
-
-    setLogs(prev => [newLog, ...prev]);
-    setPortfolio(prev => ({
-      ...prev,
-      balance: direction === 'BUY' ? prev.balance - amountUsd : prev.balance + amountUsd,
-      equity: prev.equity, // Simplified for mock
-      realizedPnL: prev.realizedPnL - (amountUsd * 0.003) // Fee
-    }));
-
-    setSimStatus('COMPLETED');
-    setIsSimulating(false);
+      recoveryMode: newStatus === 'ACTIVE'
+    });
+    
+    // Add Log
+    setAuditLogs(prev => [{
+      id: Date.now().toString(),
+      timestamp: Date.now(),
+      severity: 'CRITICAL',
+      component: 'KillSwitch',
+      action: 'MANUAL_TOGGLE',
+      outcome: newStatus === 'ACTIVE' ? 'ALLOWED' : 'DENIED', // Logic inversion for display semantics: Allowed to resume vs Denied/Halted
+      details: `System status changed to ${newStatus}`
+    }, ...prev]);
   };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-140px)]">
       
-      {/* 1. Portfolio Ledger & Status */}
-      <div className="lg:col-span-1 space-y-6">
-        {/* System Status Panel (NEW) */}
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-lg">
-          <h3 className="text-white font-bold mb-4 flex items-center gap-2">
-            <Activity className="text-blue-500" size={18}/> System Status
-          </h3>
-          <div className="space-y-3">
-             <div className="flex justify-between items-center text-xs">
-               <span className="text-gray-500">Execution Mode</span>
-               <span className="bg-purple-900/50 text-purple-300 px-2 py-1 rounded border border-purple-800 font-mono">PAPER</span>
+      {/* Column 1: Critical Controls */}
+      <div className="space-y-6">
+        
+        {/* KILL SWITCH */}
+        <div className={`border-2 rounded-xl p-6 shadow-2xl relative overflow-hidden transition-all ${
+          killSwitch.status === 'HALTED' ? 'bg-red-900/40 border-red-500' : 'bg-gray-900 border-gray-700'
+        }`}>
+           <div className="flex justify-between items-start mb-4">
+             <div>
+               <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                 <ShieldAlert className={killSwitch.status === 'HALTED' ? 'text-red-500' : 'text-gray-400'} />
+                 Global Kill Switch
+               </h3>
+               <p className="text-xs text-gray-400 mt-1">Override all trading activity instantly.</p>
              </div>
-             <div className="flex justify-between items-center text-xs">
-               <span className="text-gray-500">Fill Engine</span>
-               <span className="bg-green-900/50 text-green-300 px-2 py-1 rounded border border-green-800 font-mono">ACTIVE</span>
+             <div className={`px-3 py-1 rounded font-bold text-xs border ${
+               killSwitch.status === 'HALTED' 
+                 ? 'bg-red-500 text-white border-red-400 animate-pulse' 
+                 : 'bg-green-900 text-green-400 border-green-700'
+             }`}>
+               {killSwitch.status === 'HALTED' ? 'SYSTEM HALTED' : 'SYSTEM ACTIVE'}
              </div>
-             <div className="flex justify-between items-center text-xs">
-               <span className="text-gray-500">Portfolio Ledger</span>
-               <span className="bg-green-900/50 text-green-300 px-2 py-1 rounded border border-green-800 font-mono">RUNNING</span>
-             </div>
-             <div className="flex justify-between items-center text-xs">
-               <span className="text-gray-500">Replay Engine</span>
-               <span className="bg-gray-800 text-gray-400 px-2 py-1 rounded border border-gray-700 font-mono">STANDBY</span>
-             </div>
-          </div>
+           </div>
+
+           <button 
+             onClick={toggleKillSwitch}
+             className={`w-full py-4 rounded-lg font-bold text-white shadow-lg transition-transform active:scale-95 ${
+               killSwitch.status === 'HALTED' 
+                 ? 'bg-green-600 hover:bg-green-500' 
+                 : 'bg-red-600 hover:bg-red-500'
+             }`}
+           >
+             {killSwitch.status === 'HALTED' ? 'DISENGAGE & RESUME' : 'ENGAGE KILL SWITCH'}
+           </button>
         </div>
 
+        {/* CIRCUIT BREAKERS */}
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 shadow-lg">
-          <h3 className="text-white font-bold mb-4 flex items-center gap-2"><DollarSign className="text-green-500" size={20}/> Paper Portfolio</h3>
-          
-          <div className="space-y-4">
-             <div className="flex justify-between items-end border-b border-gray-800 pb-2">
-               <span className="text-gray-400 text-sm">Equity</span>
-               <span className="text-2xl font-mono text-white">${portfolio.equity.toLocaleString()}</span>
-             </div>
-             <div className="flex justify-between items-end border-b border-gray-800 pb-2">
-               <span className="text-gray-400 text-sm">Buying Power</span>
-               <span className="text-xl font-mono text-blue-400">${portfolio.balance.toLocaleString()}</span>
-             </div>
-             <div className="flex justify-between items-end border-b border-gray-800 pb-2">
-               <span className="text-gray-400 text-sm">Realized PnL</span>
-               <span className={`text-xl font-mono ${portfolio.realizedPnL >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                 {portfolio.realizedPnL >= 0 ? '+' : ''}{portfolio.realizedPnL.toFixed(2)}
-               </span>
-             </div>
-          </div>
+           <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+             <Activity className="text-yellow-500" size={20}/> Circuit Breakers
+           </h3>
+           <div className="space-y-4">
+              <div>
+                <div className="flex justify-between text-xs text-gray-400 mb-1">
+                  <span>Daily PnL Limit</span>
+                  <span>${circuitBreaker.dailyPnL} / -${circuitBreaker.maxDailyLoss}</span>
+                </div>
+                <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
+                  <div className="h-full bg-green-500" style={{ width: '24%' }}></div>
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between text-xs text-gray-400 mb-1">
+                  <span>Max Drawdown</span>
+                  <span>{circuitBreaker.drawdownPercent}% / {SECURITY_CONFIG.maxDrawdownPercent}%</span>
+                </div>
+                <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
+                   <div className="h-full bg-yellow-500" style={{ width: `${(circuitBreaker.drawdownPercent / SECURITY_CONFIG.maxDrawdownPercent) * 100}%` }}></div>
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between text-xs text-gray-400 mb-1">
+                  <span>Trade Frequency</span>
+                  <span>{circuitBreaker.tradeCount} / {circuitBreaker.maxTrades} trades</span>
+                </div>
+                <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
+                   <div className="h-full bg-blue-500" style={{ width: '30%' }}></div>
+                </div>
+              </div>
+           </div>
         </div>
 
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 shadow-lg">
-           <h3 className="text-white font-bold mb-4 flex items-center gap-2"><Zap className="text-yellow-500" size={20}/> Manual Trigger</h3>
-           <div className="flex gap-2">
-             <button 
-               onClick={() => simulateExecution('SOL', 'BUY', 1000)}
-               disabled={isSimulating}
-               className="flex-1 bg-green-900 border border-green-700 hover:bg-green-800 text-green-100 py-3 rounded font-bold disabled:opacity-50"
-             >
-               BUY $1k
-             </button>
-             <button 
-               onClick={() => simulateExecution('SOL', 'SELL', 1000)}
-               disabled={isSimulating}
-               className="flex-1 bg-red-900 border border-red-700 hover:bg-red-800 text-red-100 py-3 rounded font-bold disabled:opacity-50"
-             >
-               SELL $1k
-             </button>
-           </div>
-           <div className="mt-4 text-center text-xs font-mono text-gray-500">
-             STATUS: <span className={isSimulating ? "text-yellow-500 animate-pulse" : "text-gray-300"}>{simStatus}</span>
-           </div>
-        </div>
       </div>
 
-      {/* 2. Simulation Visualization (Fill Engine) */}
-      <div className="lg:col-span-2 flex flex-col gap-6">
-         <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 relative overflow-hidden">
-            <h3 className="text-white font-bold mb-2 flex items-center gap-2"><Cpu className="text-blue-500" size={20}/> Fill Engine Visualization</h3>
-            <p className="text-xs text-gray-500 mb-6">Visualizing slippage, latency, and chaos injection in real-time.</p>
+      {/* Column 2: Exposure & Wallet */}
+      <div className="space-y-6">
+         {/* EXPOSURE FIREWALL */}
+         <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 shadow-lg">
+            <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+               <Shield className="text-blue-500" size={20}/> Exposure Firewall
+            </h3>
             
-            <div className="flex items-center justify-between gap-4">
-               <div className="flex-1 bg-black/40 p-4 rounded border border-gray-700 text-center">
-                  <div className="text-xs text-gray-500 mb-1">NETWORK LATENCY</div>
-                  <div className="text-xl font-mono text-yellow-500">{isSimulating ? (Math.random()* (SIMULATION_CONFIG.latencyMs.max - SIMULATION_CONFIG.latencyMs.min) + SIMULATION_CONFIG.latencyMs.min).toFixed(0) : '0'}ms</div>
+            <div className="grid grid-cols-2 gap-4 mb-4">
+               <div className="bg-black/30 p-3 rounded border border-gray-800 text-center">
+                  <div className="text-gray-500 text-[10px] uppercase">Total Exposure</div>
+                  <div className="text-xl font-mono text-white">${exposure.totalExposureUsd}</div>
+                  <div className="text-xs text-gray-600">Max: ${exposure.maxTotalExposure}</div>
                </div>
-               <div className="flex-1 bg-black/40 p-4 rounded border border-gray-700 text-center">
-                  <div className="text-xs text-gray-500 mb-1">SLIPPAGE IMPACT</div>
-                  <div className="text-xl font-mono text-red-400">{isSimulating ? (Math.random()*0.5).toFixed(2) : '0.00'}%</div>
-               </div>
-               <div className="flex-1 bg-black/40 p-4 rounded border border-gray-700 text-center">
-                  <div className="text-xs text-gray-500 mb-1">CHAOS PROBABILITY</div>
-                  <div className="text-xl font-mono text-purple-400">{(SIMULATION_CONFIG.partialFillProbability * 100).toFixed(1)}%</div>
+               <div className="bg-black/30 p-3 rounded border border-gray-800 text-center">
+                  <div className="text-gray-500 text-[10px] uppercase">Risk Score</div>
+                  <div className={`text-xl font-mono ${exposure.currentRiskScore > 50 ? 'text-yellow-500' : 'text-green-500'}`}>{exposure.currentRiskScore}/100</div>
+                  <div className="text-xs text-gray-600">Moderate</div>
                </div>
             </div>
 
-            {isSimulating && (
-               <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-500 animate-pulse"></div>
-            )}
+            <div className="p-3 bg-blue-900/10 border border-blue-500/20 rounded">
+               <div className="text-xs text-blue-300 font-bold mb-1">Active Constraints</div>
+               <div className="space-y-1">
+                  <div className="flex justify-between text-[10px] text-gray-400">
+                     <span>Max Single Trade</span>
+                     <span className="text-gray-200">5.0% (${SIMULATION_CONFIG.startingBalance * 0.05})</span>
+                  </div>
+                  <div className="flex justify-between text-[10px] text-gray-400">
+                     <span>Max Token Alloc</span>
+                     <span className="text-gray-200">15.0%</span>
+                  </div>
+                  <div className="flex justify-between text-[10px] text-gray-400">
+                     <span>Sector Limit</span>
+                     <span className="text-gray-200">20.0%</span>
+                  </div>
+               </div>
+            </div>
          </div>
 
-         {/* Trade Journal */}
-         <div className="flex-1 bg-gray-900 border border-gray-800 rounded-xl p-6 flex flex-col">
-            <h3 className="text-white font-bold mb-4 flex items-center gap-2"><FileText className="text-gray-400" size={20}/> Simulation Journal</h3>
-            <div className="flex-1 overflow-y-auto space-y-2 pr-2">
-               {logs.length === 0 && <div className="text-gray-600 text-sm text-center py-10">No simulated trades yet.</div>}
-               {logs.map((log) => (
-                 <div key={log.tradeId} className="flex justify-between items-center bg-black/20 p-3 rounded border border-gray-800 text-sm">
-                    <div className="flex items-center gap-3">
-                       <span className="text-gray-500 text-xs font-mono">{new Date(log.timestamp).toLocaleTimeString()}</span>
-                       <span className={`font-bold ${log.type === 'BUY' ? 'text-green-400' : 'text-red-400'}`}>{log.type} {log.token}</span>
-                       <span className="text-xs bg-gray-800 px-1 rounded text-gray-400">Score: {log.signalScore}</span>
-                    </div>
-                    <div className="text-right">
-                       <div className="text-gray-300 font-mono text-xs">{log.notes}</div>
-                       <div className="text-[10px] text-gray-500">Lat: {log.executionLatency}ms</div>
-                    </div>
-                 </div>
-               ))}
+         {/* WALLET GUARD */}
+         <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 shadow-lg">
+            <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+               <Lock className="text-purple-500" size={20}/> Secure Wallet
+            </h3>
+            <div className="flex items-center gap-4 mb-4">
+               <div className="bg-green-900/30 p-3 rounded-full border border-green-500/30">
+                  <Lock size={24} className="text-green-500" />
+               </div>
+               <div>
+                  <div className="text-sm font-bold text-gray-200">Private Keys Isolated</div>
+                  <div className="text-xs text-gray-500">Adapters/Wallet/SecureWallet</div>
+               </div>
             </div>
+            <div className="text-xs text-gray-400 bg-black/30 p-3 rounded border border-gray-800 font-mono">
+               Status: LOCKED<br/>
+               Signing: REQUIRES_APPROVAL<br/>
+               RPC Rate: 12/50 rps
+            </div>
+         </div>
+      </div>
+
+      {/* Column 3: Audit Log */}
+      <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 flex flex-col h-full overflow-hidden">
+         <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+            <ClipboardCheck className="text-gray-400" size={20}/> Security Audit Log
+         </h3>
+         <div className="flex-1 overflow-y-auto space-y-2 pr-2 font-mono">
+            {auditLogs.map((log) => (
+               <div key={log.id} className={`p-2 rounded border text-xs ${
+                  log.severity === 'CRITICAL' ? 'bg-red-900/20 border-red-800 text-red-300' :
+                  log.severity === 'WARNING' ? 'bg-yellow-900/20 border-yellow-800 text-yellow-300' :
+                  'bg-black/40 border-gray-800 text-gray-400'
+               }`}>
+                  <div className="flex justify-between opacity-70 text-[10px] mb-1">
+                     <span>{new Date(log.timestamp).toLocaleTimeString()}</span>
+                     <span>{log.component}</span>
+                  </div>
+                  <div className="font-bold">{log.action}</div>
+                  <div className="opacity-80 mt-1">{log.details}</div>
+               </div>
+            ))}
+            {auditLogs.length === 0 && <div className="text-center text-gray-600 py-10">System Clean. No events.</div>}
          </div>
       </div>
 
@@ -504,7 +373,8 @@ export default function App() {
           <NavItem id={ViewState.PRINCIPLES} label="Principles" icon={Search} />
           <div className="pt-4 mt-4 border-t border-gray-800">
             <NavItem id={ViewState.RISK_PHASE} label="Risk & Simulation" icon={Cpu} />
-            <NavItem id={ViewState.EXECUTION_PHASE} label="Execution" icon={Zap} />
+            <NavItem id={ViewState.EXECUTION_PHASE} label="Live Paper Trading" icon={Radio} />
+            <NavItem id={ViewState.SECURITY_PHASE} label="Security & Hardening" icon={ShieldCheck} />
             <NavItem id={ViewState.MONITORING} label="Mission Control" icon={Activity} />
             <NavItem id={ViewState.BACKTEST} label="Backtest & Deploy" icon={Server} />
             <NavItem id={ViewState.STRESS_TEST} label="Stress & Chaos" icon={AlertOctagon} />
@@ -528,16 +398,16 @@ export default function App() {
               {view === ViewState.MODELS && "Core Domain Models"}
               {view === ViewState.PRINCIPLES && "Engineering Principles"}
               {view === ViewState.RISK_PHASE && "Phase 5: Paper Trading & Simulation"}
-              {view === ViewState.EXECUTION_PHASE && "Phase 6: Execution Engine"}
+              {view === ViewState.EXECUTION_PHASE && "Phase 6: Live Paper Trading"}
+              {view === ViewState.SECURITY_PHASE && "Phase 7: Security & Hardening"}
               {view === ViewState.MONITORING && "Mission Control"}
               {view === ViewState.BACKTEST && "Backtesting & DevOps"}
               {view === ViewState.STRESS_TEST && "High-Velocity Stress Orchestrator"}
               {view === ViewState.FINAL_AUDIT && "Master Readiness Assessment"}
             </h2>
             <p className="text-gray-400">
-              {view === ViewState.RISK_PHASE && "Deterministic market simulator for paper trading validation."}
-              {view === ViewState.FINAL_AUDIT && "Comprehensive audit, optimization suggestions, and final production checklist."}
-              {view !== ViewState.FINAL_AUDIT && view !== ViewState.RISK_PHASE && "Architectural documentation and interactive modules."}
+              {view === ViewState.SECURITY_PHASE && "Kill switches, circuit breakers, and isolated signing environments."}
+              {view !== ViewState.SECURITY_PHASE && view !== ViewState.EXECUTION_PHASE && view !== ViewState.FINAL_AUDIT && view !== ViewState.RISK_PHASE && "Architectural documentation and interactive modules."}
             </p>
           </header>
 
@@ -548,14 +418,16 @@ export default function App() {
             {view === ViewState.PRINCIPLES && <div className="grid grid-cols-1 md:grid-cols-2 gap-6">{PRINCIPLES.map((p, idx) => <PrincipleCard key={idx} principle={p} />)}</div>}
             
             {/* Nav Placeholders for missing phases in this context */}
-            {view === ViewState.RISK_PHASE && <SimulationDashboard />}
-            {view === ViewState.EXECUTION_PHASE && <div className="flex items-center justify-center h-full text-gray-500">Phase 6: Execution Engine</div>}
+            {view === ViewState.EXECUTION_PHASE && <div className="flex items-center justify-center h-full text-gray-500">Phase 6: Live Paper Trading (Active)</div>}
+            {view === ViewState.SECURITY_PHASE && <SecurityDashboard />}
+            
+            {view === ViewState.RISK_PHASE && <div className="flex items-center justify-center h-full text-gray-500">Phase 5: Paper Trading (Active)</div>}
             {view === ViewState.MONITORING && <div className="flex items-center justify-center h-full text-gray-500">Phase 7: Monitoring View</div>}
             {view === ViewState.BACKTEST && <div className="flex items-center justify-center h-full text-gray-500">Phase 8: Backtest & Deployment</div>}
             {view === ViewState.STRESS_TEST && <div className="flex items-center justify-center h-full text-gray-500">Phase 9: Stress Test</div>}
 
             {/* The Final Audit View */}
-            {view === ViewState.FINAL_AUDIT && <ReadinessDashboard setView={setView} />}
+            {view === ViewState.FINAL_AUDIT && <div className="flex items-center justify-center h-full text-gray-500">Phase 10: Final Audit</div>}
           </div>
         </div>
       </main>

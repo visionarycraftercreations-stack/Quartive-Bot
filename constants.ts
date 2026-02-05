@@ -1,191 +1,116 @@
-import { FolderItem, PipelineStep, DomainModel, Principle, AuditCategory, OptimizationTip } from './types';
-
-export const SIMULATION_CONFIG = {
-  startingBalance: 10000,
-  slippageMultiplier: 1.2, // Amplify volatility for stress testing
-  latencyMs: { min: 200, max: 800 },
-  partialFillProbability: 0.05,
-  feeModel: { maker: 0.002, taker: 0.002 } // 0.2%
-};
+import { FolderItem, PipelineStep, DomainModel, Principle, OptimizationTip } from './types';
 
 export const FOLDER_STRUCTURE: FolderItem = {
-  name: 'root',
+  name: 'src',
   type: 'folder',
   children: [
     {
-      name: 'src',
+      name: 'core',
       type: 'folder',
       children: [
-        {
-          name: 'core',
-          type: 'folder',
-          children: [
-            {
-              name: 'simulation',
-              type: 'folder',
-              description: 'Phase 5: Paper Trading Engine',
-              children: [
-                { name: 'providers.ts', type: 'file', description: 'PaperExecutionProvider & Interfaces' },
-                { name: 'fill_engine.ts', type: 'file', description: 'Slippage & Latency Logic' },
-                { name: 'ledger.ts', type: 'file', description: 'PortfolioLedger & PositionSimulator' },
-                { name: 'journal.ts', type: 'file', description: 'TradeJournal Persistence' },
-                { name: 'replay_engine.ts', type: 'file', description: 'ReplayEngine Interface (Placeholder)' }
-              ]
-            },
-            {
-              name: 'optimization',
-              type: 'folder',
-              description: 'Phase 10: Performance Tuning',
-              children: [
-                { name: 'worker_pool.ts', type: 'file', description: 'Offloads scoring to threads.' },
-                { name: 'memory_guard.ts', type: 'file', description: 'Prevents heap overflows.' }
-              ]
-            },
-            {
-              name: 'monitoring',
-              type: 'folder',
-              children: [
-                { name: 'logger.ts', type: 'file' },
-                { name: 'metrics.ts', type: 'file' }
-              ]
-            },
-            {
-               name: 'execution',
-               type: 'folder',
-               children: [
-                  { name: 'engine.ts', type: 'file' },
-                  { name: 'state_machine.ts', type: 'file' }
-               ]
-            }
-          ]
+        { 
+          name: 'execution', 
+          type: 'folder', 
+          children: [{ name: 'SigningPipeline.ts', type: 'file' }] 
         },
-        // ... previous folders
+        { 
+          name: 'risk', 
+          type: 'folder', 
+          children: [{ name: 'ExecutionGuard.ts', type: 'file' }] 
+        },
       ]
-    }
+    },
+    { name: 'strategies', type: 'folder' },
+    { name: 'config', type: 'folder' },
   ]
 };
 
 export const PIPELINE_STEPS: PipelineStep[] = [
-  {
-    id: 1,
-    title: 'Architecture Audit',
-    component: 'Structure Review',
-    description: 'Validating modular boundaries and dependency graph.',
-    icon: 'Search'
-  },
-  {
-    id: 2,
-    title: 'Stress Analysis',
-    component: 'Phase 9 Results',
-    description: 'Reviewing Event Loop Lag under 5000 TPS load.',
-    icon: 'Activity'
-  },
-  {
-    id: 3,
-    title: 'Optimization',
-    component: 'System Tuner',
-    description: 'Applying Worker Threads and Memory Limits.',
-    icon: 'Zap'
-  },
-  {
-    id: 4,
-    title: 'Final Checklist',
-    component: 'Go/No-Go',
-    description: 'Verifying all safety checks before launch.',
-    icon: 'CheckCircle'
-  }
+  { id: '1', title: 'Market Data Ingestion', description: 'Normalized WebSocket streams', icon: 'Radio' },
+  { id: '2', title: 'Signal Generation', description: 'Strategy evaluation engine', icon: 'Cpu' },
+  { id: '3', title: 'Risk Check', description: 'Pre-trade validation', icon: 'ShieldCheck' },
+  { id: '4', title: 'Execution', description: 'Transaction signing & broadcasting', icon: 'Zap' },
 ];
 
 export const DOMAIN_MODELS: DomainModel[] = [
   {
-    name: 'core/simulation/providers.ts',
-    description: 'Adapters for switching between Live and Paper execution.',
-    code: `export interface ExecutionProvider {
-  executeBuy(order: OrderIntent): Promise<ExecutionResult>;
-  executeSell(order: OrderIntent): Promise<ExecutionResult>;
-}
-
-export class PaperExecutionProvider implements ExecutionProvider {
-  constructor(private fillEngine: FillEngine, private journal: TradeJournal) {}
-
-  async executeBuy(order: OrderIntent): Promise<ExecutionResult> {
-    const fill = await this.fillEngine.simulateFill(order);
-    this.journal.logExecution(fill);
-    return fill;
-  }
-  
-  // ... executeSell implementation
-}`
-  },
-  {
-    name: 'core/simulation/ledger.ts',
-    description: 'Tracks Equity, PnL, and Open Positions in memory.',
-    code: `export class PortfolioLedger {
-  private balance: number;
-  private positions: Map<string, SimulatedPosition>;
-
-  public updateEquity(marketData: Map<string, number>) {
-    // Recalculate Unrealized PnL for all open positions
-    this.positions.forEach(pos => {
-      const currentPrice = marketData.get(pos.token) || pos.currentPrice;
-      pos.unrealizedPnL = (currentPrice - pos.entryPrice) * pos.size;
-    });
-  }
-
-  public checkMargin(amount: number): boolean {
-    return this.balance >= amount;
-  }
-}`
-  },
-  {
-    name: 'core/simulation/fill_engine.ts',
-    description: 'Deterministic market simulator for paper trading.',
-    code: `export class FillEngine {
-  private readonly FAIL_RATE = 0.08; // 8% Chaos
-
-  public async simulateFill(order: OrderIntent): Promise<ExecutionResult> {
-    // 1. Calculate Slippage
-    // Impact increases linearly with order size relative to pool
-    const liquidity = await this.getLiquidity(order.token);
-    const impact = order.amount / liquidity; 
-    const slippage = impact * SIMULATION_CONFIG.slippageMultiplier;
+    name: 'core/risk/execution_guard.ts',
+    description: 'Validates orders against risk parameters.',
+    code: `export class ExecutionGuard {
+  validate(intent: OrderIntent): boolean {
+    // 1. Check Max Amount
+    if (intent.amount > 1000) return false;
     
-    // 2. Simulate Network Latency (RPC + Block Time)
-    const latency = this.randomLatency();
-    await this.sleep(latency);
+    // 2. Check Blacklist
+    if (this.isBlacklisted(intent.token)) return false;
 
-    // 3. Chaos Injection
-    if (Math.random() < this.FAIL_RATE) {
-       throw new Error('Simulation: Slippage Exceeded during pending block');
+    return true;
+  }
+}`
+  },
+  {
+    name: 'core/execution/signing_pipeline.ts',
+    description: 'Sandbox environment that validates transaction safety before signing.',
+    code: `export class SigningPipeline {
+  constructor(
+    private guard: ExecutionGuard,
+    private wallet: SecureWallet,
+    private auditLog: AuditLogger
+  ) {}
+
+  public async process(
+    intent: OrderIntent, 
+    ctx: SigningContext
+  ): Promise<SignedTransaction> {
+    // 1. Guard Validation (State, Risk, KillSwitch)
+    await this.guard.validate(intent);
+
+    // 2. Sandbox Safety Checks
+    this.runSandboxChecks(intent, ctx);
+
+    // 3. Approve & Sign
+    // Only reachable if Sandbox checks pass
+    const signature = await this.wallet.signTransaction({
+      to: intent.token,
+      amount: intent.amount,
+      data: '0x...' // Constructed Transaction Data
+    }, intent.id);
+
+    // 4. Broadcast
+    return {
+      intentId: intent.id,
+      txHash: \`0x\${Math.random().toString(36).substring(2)}\`,
+      signature,
+      broadcastTime: Date.now()
+    };
+  }
+
+  private runSandboxChecks(intent: OrderIntent, ctx: SigningContext) {
+    // Check 1: Slippage Hard Limit
+    const MAX_SLIPPAGE = 0.05; // 5% Hard Cap
+    if (intent.slippageTolerance > MAX_SLIPPAGE) {
+      throw new Error(\`SANDBOX REJECT: Slippage \${intent.slippageTolerance} exceeds max \${MAX_SLIPPAGE}\`);
     }
 
-    // ... return ExecutionResult
+    // Check 2: Liquidity Depth
+    const MIN_DEPTH_RATIO = 5; // Pool must be 5x larger than order
+    if (ctx.liquidityUsd < intent.amount * MIN_DEPTH_RATIO) {
+      throw new Error(\`SANDBOX REJECT: Insufficient liquidity depth (Pool: $\${ctx.liquidityUsd} vs Order: $\${intent.amount})\`);
+    }
+
+    // Check 3: Gas Spikes
+    const MAX_GAS_GWEI = 100;
+    if (ctx.gasPriceGwei > MAX_GAS_GWEI) {
+      throw new Error(\`SANDBOX REJECT: Gas spike detected (\${ctx.gasPriceGwei} Gwei)\`);
+    }
+
+    // Check 4: MEV Risk
+    if (ctx.mevRiskScore > 80) {
+      throw new Error('SANDBOX REJECT: High MEV risk probability');
+    }
+    
+    this.auditLog.info('SigningSandbox', 'CHECKS_PASSED', intent.id);
   }
-}`
-  },
-  {
-    name: 'core/simulation/replay_engine.ts',
-    description: 'Backtesting placeholder interface.',
-    code: `export interface ReplayEngine {
-  /**
-   * Loads historical tick data for backtesting.
-   */
-  loadDataset(datasetId: string): Promise<void>;
-
-  /**
-   * Starts feeding historical ticks into the Strategy Engine.
-   */
-  startReplay(): void;
-
-  /**
-   * Pauses the simulation.
-   */
-  pauseReplay(): void;
-
-  /**
-   * Jumps to a specific point in time.
-   */
-  seek(timestamp: number): void;
 }`
   }
 ];
@@ -193,72 +118,35 @@ export class PaperExecutionProvider implements ExecutionProvider {
 export const PRINCIPLES: Principle[] = [
   {
     title: 'Survival > Profit',
-    description: 'Paper trading must enforce strict risk limits.',
-    points: [
-      'Portfolio Ledger checks balance before every Simulated Trade.',
-      'Slippage modeling must be pessimistic (assume worst case).',
-      'Latency injection prevents "perfect timing" bias in simulations.'
-    ]
+    description: 'Capital preservation is the primary objective.',
+    points: ['Strict stop losses', 'Exposure limits', 'Kill switches']
   },
   {
-    title: 'Zero-Trust Architecture',
-    description: 'Assume every API will fail and every input is malformed.',
-    points: [
-      'Validate schema of every incoming WebSocket message.',
-      'Never trust the price until cross-referenced (e.g., Pyth + DexScreener).',
-      'Execution engine must verify balance before *every* order.'
-    ]
+    title: 'Deterministic Execution',
+    description: 'No random behavior. All actions must be traceable.',
+    points: ['Audit logging', 'Idempotency', 'State machines']
   }
 ];
 
-export const PRODUCTION_CHECKLIST: AuditCategory[] = [
-  {
-    id: 'SEC',
-    name: 'Security & Risk',
-    status: 'READY',
-    score: 100,
-    items: [
-      { label: 'Private Keys injected via ENV only', done: true, critical: true },
-      { label: 'Kill Switch functionality verified', done: true, critical: true },
-      { label: 'Max Drawdown limit hard-coded', done: true, critical: true },
-      { label: 'RPC Rate Limits handled', done: true }
-    ]
-  },
-  {
-    id: 'PERF',
-    name: 'Performance',
-    status: 'WARNING',
-    score: 85,
-    items: [
-      { label: 'Event Loop Lag < 10ms under load', done: false, critical: true },
-      { label: 'Memory Leak checks (Heap dumps)', done: true },
-      { label: 'Worker Threads implemented', done: false } // Optimization needed
-    ]
-  },
-  {
-    id: 'OBS',
-    name: 'Observability',
-    status: 'READY',
-    score: 95,
-    items: [
-      { label: 'Structured Logging (JSON)', done: true },
-      { label: 'Alerting (Telegram/PagerDuty)', done: true, critical: true },
-      { label: 'Trade "Flight Recorder" active', done: true }
-    ]
-  }
+export const PRODUCTION_CHECKLIST: string[] = [
+  'Environment variables secure',
+  'Wallet keys isolated',
+  'Logging configured',
+  'Circuit breakers tested',
+  'Network redundancy active'
 ];
 
 export const OPTIMIZATIONS: OptimizationTip[] = [
-  {
-    title: 'Offload Scoring to Worker Threads',
-    impact: 'HIGH',
-    description: 'The stress test revealed Event Loop Lag > 50ms during high volatility. Moving the scoring logic to a separate thread pool will free up the main loop for I/O.',
-    codeSnippet: 'new Worker("./scorer.js")'
-  },
-  {
-    title: 'Implement Redis Event Bus',
-    impact: 'MEDIUM',
-    description: 'Node EventEmitter is fast but local. Using Redis Pub/Sub allows splitting the bot into microservices (Ingestor vs Executor) for better scaling.',
-    codeSnippet: 'redis.publish("PRICE_UPDATE", payload)'
-  }
+  { title: 'JIT Compilation', description: 'Use warm-up scripts', impact: 'High' },
+  { title: 'Connection Pooling', description: 'Reuse WS connections', impact: 'Medium' }
 ];
+
+export const SIMULATION_CONFIG = {
+  startingBalance: 10000,
+  latencyMs: 50
+};
+
+export const SECURITY_CONFIG = {
+  maxDailyLossUsd: 500,
+  maxDrawdownPercent: 10
+};
